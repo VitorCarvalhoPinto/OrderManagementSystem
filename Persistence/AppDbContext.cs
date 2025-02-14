@@ -1,12 +1,16 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using OrderManagementSystem.Models;
+using Domain.Entities;
 
-namespace Loja.Data
+namespace Persistence
 {
     public class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         public DbSet<Order> Order { get; set; }
-        
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        }
     }
 }

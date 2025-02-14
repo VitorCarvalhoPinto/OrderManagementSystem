@@ -1,0 +1,28 @@
+services:
+  ordermanagementsystem:
+    image: ${DOCKER_REGISTRY-}ordermanagementsystem
+    build:
+      context: .
+      dockerfile: OrderManagementSystem/Dockerfile
+    networks:
+      - OrderManagementSystem-network
+  
+  OrderManagementSystemDB:
+    image: postgres:15
+    container_name: OrderManagementSystemDB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: OrderManagementSystem
+    ports:
+      - 5432:5432
+    networks:
+      - OrderManagementSystem-network
+volumes:
+ postgres_data: 
+
+networks:
+ OrderManagementSystem-network:
+    driver: bridge

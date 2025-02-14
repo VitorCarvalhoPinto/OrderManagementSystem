@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace OrderManagementSystem.Models
+namespace Domain.Entities
 {
-    public class OrderDTO
+    public class Order
     {
+        [Key]
         public Guid OrderId { get; set; }
         public String Cliente { get; set; }
         public String Produto { get; set; }
