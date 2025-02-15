@@ -11,12 +11,16 @@ Este é o projeto Order Management System, uma aplicação .NET 8 que utiliza Po
 
 1. Clone o repositório para sua máquina local:
 
+```bash
 git clone https://github.com/seu-usuario/ordermanagementsystem.git
 cd ordermanagementsystem
+```
 
 2. Certifique-se de que o arquivo `docker-compose.yml` está configurado corretamente. Ele deve conter os serviços `ordermanagementsystem` e `OrderManagementSystemDB`.
 
 3. Será necessário configurar suas secrets no projeto OrderManagementSystem, seguindo este modelo:
+
+```bash
 {
     "Kestrel:Certificates:Development:Password": "b102d280-d020-4ad8-b586-d5934d80c2f2",
     "ConnectionStrings:DefaultConnection": "Host=OrderManagementSystemDB;Port=5432;Database=OrderManagementSystem;Username=postgres;Password=1234",
@@ -25,6 +29,7 @@ cd ordermanagementsystem
         "ConnectionString": "StringDeConexão"
     }
 }
+```
 
 ## Executando o Projeto
 
