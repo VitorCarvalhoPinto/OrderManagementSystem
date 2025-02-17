@@ -1,10 +1,12 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using System;
 using Domain.Entities;
 using Persistence;
 
@@ -15,50 +17,73 @@ namespace OrderManagementSystem.Worker
         private readonly string _connectionString;
         private readonly string _queueName;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceBusClient _client;
+        private readonly ServiceBusProcessor _processor;
 
-        public OrderWorker(IConfiguration configuration, IServiceScopeFactory serviceScopeFactory) 
+        public OrderWorker(IConfiguration configuration, IServiceScopeFactory serviceScopeFactory)
         {
             _connectionString = configuration["AzureServiceBus:ConnectionString"];
             _queueName = configuration["AzureServiceBus:QueueName"];
             _serviceScopeFactory = serviceScopeFactory;
+
+            _client = new ServiceBusClient(_connectionString);
+            _processor = _client.CreateProcessor(_queueName, new ServiceBusProcessorOptions());
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken) 
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await using var client = new ServiceBusClient(_connectionString);
-            ServiceBusProcessor processor = client.CreateProcessor(_queueName, new ServiceBusProcessorOptions());
 
-            processor.ProcessMessageAsync += async args =>
+            _processor.ProcessMessageAsync += ProcessMessageAsync;
+            _processor.ProcessErrorAsync += ProcessErrorAsync;
+
+            await _processor.StartProcessingAsync();
+        }
+
+        private async Task ProcessMessageAsync(ProcessMessageEventArgs args)
+        {
+            try
             {
-                var order = JsonSerializer.Deserialize<Order>(args.Message.Body.ToString());
+                var messageBody = args.Message.Body.ToString();
+
+                var order = JsonSerializer.Deserialize<Order>(messageBody);
 
                 using (var scope = _serviceScopeFactory.CreateScope())
                 {
                     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-                    var existingOrder = await dbContext.Order.FindAsync(order.OrderId);
-                    if (existingOrder != null)
-                    {
-                        existingOrder.Status = "Processando";
-                        await dbContext.SaveChangesAsync();
+                    var existingOrder = await dbContext.Order
+                        .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
 
-                        await Task.Delay(5000);
+                    Console.WriteLine($"✅ Pedido encontrado: {existingOrder.OrderId} - Status: {existingOrder.Status}");
 
-                        existingOrder.Status = "Finalizado";
-                        await dbContext.SaveChangesAsync();
-                    }
+                    existingOrder.Status = "Processando";
+                    await dbContext.SaveChangesAsync();
+
+                    await Task.Delay(5000);
+
+                    existingOrder.Status = "Finalizado";
+                    await dbContext.SaveChangesAsync();
                 }
 
                 await args.CompleteMessageAsync(args.Message);
-            };
-
-            processor.ProcessErrorAsync += args =>
+            }
+            catch (Exception ex)
             {
-                Console.WriteLine($"Erro: {args.Exception}");
-                return Task.CompletedTask;
+                Console.WriteLine($"Erro no processamento da mensagem: {ex.Message}");
+            }
+        }
 
-            };
-            await processor.StartProcessingAsync();
+        private Task ProcessErrorAsync(ProcessErrorEventArgs args)
+        {
+            return Task.CompletedTask;
+        }
+
+        public override async Task StopAsync(CancellationToken cancellationToken)
+        {
+
+            await _processor.StopProcessingAsync();
+            await _processor.DisposeAsync();
+            await _client.DisposeAsync();
         }
     }
 }
